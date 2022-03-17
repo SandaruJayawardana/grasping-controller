@@ -4,8 +4,8 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}//open3d",
-                "${workspaceFolder}//librealsense"
+                "${workspaceFolder}//include//open3d",
+                "${workspaceFolder}//include//librealsense"
             ],
             "defines": [
                 "_DEBUG",
