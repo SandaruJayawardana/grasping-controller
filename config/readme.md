@@ -1,5 +1,5 @@
-* **Configuration Details**
-> **Gripper Settings**
+# **Configuration Details**
+## **Gripper Settings**
 > 1. Standard Parallel Grippers
 > 
 > Gripper is containing symmetrical jaws.
