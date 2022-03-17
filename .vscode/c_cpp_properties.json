@@ -12,7 +12,7 @@
                 "UNICODE",
                 "_UNICODE"
             ],
-            "cStandard": "c14",
+            "cStandard": "c11",
             "cppStandard": "c++14",
             "intelliSenseMode": "windows-msvc-x64"
         }
