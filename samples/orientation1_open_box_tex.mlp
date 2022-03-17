@@ -1,0 +1,18 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh visible="1" idInFile="-1" filename="orientation2_open_R_box_tex.ply" label="orientation2_open_R_box_tex.ply">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption solidColor="192 192 192 255" boxColor="234 234 234 255" wireWidth="1" wireColor="64 64 64 255" pointSize="3" pointColor="252 233 79 255">100001010000000000000000000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh visible="1" idInFile="-1" filename="orientation2_open_L_box_tex.ply" label="orientation2_open_L_box_tex.ply">
+   <MLMatrix44>
+0.290971 0.320882 -0.901316 -0.680186 -0.314628 0.921773 0.226594 0.154877 0.903518 0.217647 0.369168 -0.4771 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption solidColor="192 192 192 255" boxColor="234 234 234 255" wireWidth="1" wireColor="64 64 64 255" pointSize="3" pointColor="252 233 79 255">100001010000000000000100000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>

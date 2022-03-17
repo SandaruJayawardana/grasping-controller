@@ -1,0 +1,24 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh visible="1" idInFile="-1" filename="orientation1_L_R_merged_box_tex.ply" label="orientation1_L_box_tex.ply">
+   <MLMatrix44>
+0.318373 0.318432 -0.892883 -0.377561 -0.319675 0.922787 0.215111 0.0979075 0.892438 0.216947 0.395585 -0.27586 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption solidColor="192 192 192 255" boxColor="234 234 234 255" wireWidth="1" wireColor="64 64 64 255" pointSize="3" pointColor="252 233 79 255">100001010000000000000100000001010100000010100000000100111010100001001001</RenderingOption>
+  </MLMesh>
+  <MLMesh visible="1" idInFile="-1" filename="orientation1_R_box_tex.ply" label="orientation1_R_box_tex.ply">
+   <MLMatrix44>
+1 0 0 0.293032 0 1 0 -0.0503072 0 0 1 0.166708 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption solidColor="192 192 192 255" boxColor="234 234 234 255" wireWidth="1" wireColor="64 64 64 255" pointSize="3" pointColor="252 233 79 255">100001010000000000000100000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+  <MLMesh visible="0" idInFile="-1" filename="orientation1_L_R_merged_box_tex.ply" label="orientation1_L_R_merged_box_tex.ply">
+   <MLMatrix44>
+1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 
+</MLMatrix44>
+   <RenderingOption solidColor="192 192 192 255" boxColor="234 234 234 255" wireWidth="1" wireColor="64 64 64 255" pointSize="3" pointColor="252 233 79 255">100001010000000000000000000001010110000010100000000100111010100000001001</RenderingOption>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>
