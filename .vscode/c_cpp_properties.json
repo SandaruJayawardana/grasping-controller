@@ -5,7 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}//open3d",
-                "${workspaceFolder}//librealsense2"
+                "${workspaceFolder}//librealsense"
             ],
             "defines": [
                 "_DEBUG",
