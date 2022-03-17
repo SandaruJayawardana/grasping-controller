@@ -1,0 +1,12 @@
+{
+    "type": ["parallel", "standard"],
+    "physical_details": {
+        "width": 50,
+        "hight": 50,
+        "thickness": 5
+    },
+    "mechanical_details": {
+        "max_openning": 100,
+        "min_close": 0
+    }
+}
