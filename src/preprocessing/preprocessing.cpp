@@ -5,7 +5,7 @@
 
 #include "open3d/Open3D.h"
 
-float degToRad(float degree);
+float degToRad(float);
 
 struct cameraOrientation
 {
@@ -40,6 +40,16 @@ const cameraOrientation RIGHT_TOP = {
     Z_ANGLE: degToRad(60),
 };
 
+const cameraOrientation CROP_BOX = {
+    X: -.5,
+    Y: 1,
+    Z: 1,
+
+    X_ANGLE: degToRad(0),
+    Y_ANGLE: degToRad(0),
+    Z_ANGLE: degToRad(0),
+};
+
 float degToRad(float degree) {
     return degree*(M_PI/180);
 }
@@ -65,18 +75,18 @@ void transformPointcloud(open3d::geometry::PointCloud &pointcloud, cameraOrienta
 }
 
 void filterObject(open3d::geometry::PointCloud *poinCloud) {
-    const Eigen::Vector3d center {0, 0, 0};
-    const Eigen::Vector3d extent {0, 0, 0};
+    const Eigen::Vector3d center {CROP_BOX.X, CROP_BOX.Y, CROP_BOX.Z};
+    const Eigen::Vector3d extent {30, 30, 30};
     const Eigen::Matrix3d rMat {
-        {cos(orientation.Z_ANGLE)*cos(orientation.Y_ANGLE), 
-        cos(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*sin(orientation.X_ANGLE) - sin(orientation.Z_ANGLE)*cos(orientation.X_ANGLE), 
-        cos(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*cos(orientation.X_ANGLE) + sin(orientation.Z_ANGLE)*sin(orientation.X_ANGLE)}, 
+        {cos(CROP_BOX.Z_ANGLE)*cos(CROP_BOX.Y_ANGLE), 
+        cos(CROP_BOX.Z_ANGLE)*sin(CROP_BOX.Y_ANGLE)*sin(CROP_BOX.X_ANGLE) - sin(CROP_BOX.Z_ANGLE)*cos(CROP_BOX.X_ANGLE), 
+        cos(CROP_BOX.Z_ANGLE)*sin(CROP_BOX.Y_ANGLE)*cos(CROP_BOX.X_ANGLE) + sin(CROP_BOX.Z_ANGLE)*sin(CROP_BOX.X_ANGLE)}, 
 
-        {sin(orientation.Z_ANGLE)*cos(orientation.Y_ANGLE), 
-        sin(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*sin(orientation.X_ANGLE) + cos(orientation.Z_ANGLE)*cos(orientation.X_ANGLE), 
-        sin(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*cos(orientation.X_ANGLE) - cos(orientation.Z_ANGLE)*sin(orientation.X_ANGLE)},
+        {sin(CROP_BOX.Z_ANGLE)*cos(CROP_BOX.Y_ANGLE), 
+        sin(CROP_BOX.Z_ANGLE)*sin(CROP_BOX.Y_ANGLE)*sin(CROP_BOX.X_ANGLE) + cos(CROP_BOX.Z_ANGLE)*cos(CROP_BOX.X_ANGLE), 
+        sin(CROP_BOX.Z_ANGLE)*sin(CROP_BOX.Y_ANGLE)*cos(CROP_BOX.X_ANGLE) - cos(CROP_BOX.Z_ANGLE)*sin(CROP_BOX.X_ANGLE)},
         
-        {-sin(orientation.Y_ANGLE), cos(orientation.Y_ANGLE)*sin(orientation.X_ANGLE), cos(orientation.Y_ANGLE)*cos(orientation.X_ANGLE)}
+        {-sin(CROP_BOX.Y_ANGLE), cos(CROP_BOX.Y_ANGLE)*sin(CROP_BOX.X_ANGLE), cos(CROP_BOX.Y_ANGLE)*cos(CROP_BOX.X_ANGLE)}
         };
     const auto cropBox = open3d::geometry::OrientedBoundingBox(center, rMat, extent);
 
@@ -105,6 +115,8 @@ int main(int argc, char *argv[]) {
         cloud_ptr->NormalizeNormals();
 
         transformPointcloud(*cloud_ptr, RIGHT_TOP);
+
+        cloud_ptr = cloud_ptr->VoxelDownSample(0.005);
 
         visualization::DrawGeometries({cloud_ptr}, "PointCloud", 1600, 900);
     }
