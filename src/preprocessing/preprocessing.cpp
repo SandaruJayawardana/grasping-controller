@@ -35,9 +35,9 @@ const cameraOrientation RIGHT_TOP = {
     Y: 1,
     Z: 1,
 
-    X_ANGLE: degToRad(120),
-    Y_ANGLE: degToRad(120),
-    Z_ANGLE: degToRad(120),
+    X_ANGLE: degToRad(60),
+    Y_ANGLE: degToRad(60),
+    Z_ANGLE: degToRad(60),
 };
 
 float degToRad(float degree) {
@@ -58,13 +58,30 @@ void transformPointcloud(open3d::geometry::PointCloud &pointcloud, cameraOrienta
         };
     
     const Eigen::Vector3d center {0, 0, 0};
+    const Eigen::Vector3d translate {0, 0, 0};
 
     pointcloud.Rotate(rMat, center);
+    pointcloud.Translate(translate);
 }
 
-// void filterObject(open3d::geometry::PointCloud *poinCloud) {
+void filterObject(open3d::geometry::PointCloud *poinCloud) {
+    const Eigen::Vector3d center {0, 0, 0};
+    const Eigen::Vector3d extent {0, 0, 0};
+    const Eigen::Matrix3d rMat {
+        {cos(orientation.Z_ANGLE)*cos(orientation.Y_ANGLE), 
+        cos(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*sin(orientation.X_ANGLE) - sin(orientation.Z_ANGLE)*cos(orientation.X_ANGLE), 
+        cos(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*cos(orientation.X_ANGLE) + sin(orientation.Z_ANGLE)*sin(orientation.X_ANGLE)}, 
 
-// }
+        {sin(orientation.Z_ANGLE)*cos(orientation.Y_ANGLE), 
+        sin(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*sin(orientation.X_ANGLE) + cos(orientation.Z_ANGLE)*cos(orientation.X_ANGLE), 
+        sin(orientation.Z_ANGLE)*sin(orientation.Y_ANGLE)*cos(orientation.X_ANGLE) - cos(orientation.Z_ANGLE)*sin(orientation.X_ANGLE)},
+        
+        {-sin(orientation.Y_ANGLE), cos(orientation.Y_ANGLE)*sin(orientation.X_ANGLE), cos(orientation.Y_ANGLE)*cos(orientation.X_ANGLE)}
+        };
+    const auto cropBox = open3d::geometry::OrientedBoundingBox(center, rMat, extent);
+
+    poinCloud->Crop(cropBox);
+}
 
 int main(int argc, char *argv[]) {
     using namespace open3d;
