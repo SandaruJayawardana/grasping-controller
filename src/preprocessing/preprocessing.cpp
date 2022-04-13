@@ -8,47 +8,50 @@
 /* Parameters */
 
 // Tunning parameters
-#define VOXEL_DOWN_SAMPLE 0.005
+#define VOXEL_DOWN_SAMPLE 0.003
 
 // Working area
 // In meters
-#define BOX_X 0.30
-#define BOX_Y 0.30
-#define BOX_Z 0.30
-// In radian
-#define BOX_X_ANGLE 0.30
-#define BOX_Y_ANGLE 0.30
-#define BOX_Z_ANGLE 0.30
-
-// Working area
+#define BOX_SIZE_X 0.25
+#define BOX_SIZE_Y 0.25
+#define BOX_SIZE_Z 0.25
 // In meters
-#define BOX_X 0.30
-#define BOX_Y 0.30
-#define BOX_Z 0.30
-// In radian
-#define BOX_X_ANGLE 0.30
-#define BOX_Y_ANGLE 0.30
-#define BOX_Z_ANGLE 0.30
+#define BOX_X 0
+#define BOX_Y 0.11
+#define BOX_Z 0
+// In degree
+#define BOX_X_ANGLE 0
+#define BOX_Y_ANGLE 0
+#define BOX_Z_ANGLE 0
 
 // Camera Right Top
 // In meters
-#define CAMERA_RIGHT_TOP_X 0.30
-#define CAMERA_RIGHT_TOP_Y 0.30
-#define CAMERA_RIGHT_TOP_Z 0.30
-// In radian
-#define CAMERA_RIGHT_TOP_X_ANGLE 0.30
-#define CAMERA_RIGHT_TOP_Y_ANGLE 0.30
-#define CAMERA_RIGHT_TOP_Z_ANGLE 0.30
+#define CAMERA_RIGHT_TOP_X 0
+#define CAMERA_RIGHT_TOP_Y 0
+#define CAMERA_RIGHT_TOP_Z 0
+// In degree
+#define CAMERA_RIGHT_TOP_X_ANGLE -20
+#define CAMERA_RIGHT_TOP_Y_ANGLE 60
+#define CAMERA_RIGHT_TOP_Z_ANGLE 0
+// In meters
+#define CAMERA_RIGHT_TOP_CENTER_CORRECTION_X 0.55
+#define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Y 0.4
+#define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Z 0.37
+
 
 // Camera Left Top
 // In meters
-#define CAMERA_LEFT_TOP_X 0.30
-#define CAMERA_LEFT_TOP_X 0.30
-#define CAMERA_LEFT_TOP_X 0.30
-// In radian
-#define CAMERA_LEFT_TOP_X_ANGLE 0.30
-#define CAMERA_LEFT_TOP_Y_ANGLE 0.30
-#define CAMERA_LEFT_TOP_Z_ANGLE 0.30
+#define CAMERA_LEFT_TOP_X 0
+#define CAMERA_LEFT_TOP_Y 0
+#define CAMERA_LEFT_TOP_Z 0
+// In degree
+#define CAMERA_LEFT_TOP_X_ANGLE -20
+#define CAMERA_LEFT_TOP_Y_ANGLE -60
+#define CAMERA_LEFT_TOP_Z_ANGLE 0
+// In meters
+#define CAMERA_LEFT_TOP_CENTER_CORRECTION_X -0.63
+#define CAMERA_LEFT_TOP_CENTER_CORRECTION_Y 0.4
+#define CAMERA_LEFT_TOP_CENTER_CORRECTION_Z 0.26
 
 // Function signatures
 float degToRad(float);
@@ -67,33 +70,33 @@ struct cameraOrientation {
 };
 
 const cameraOrientation LEFT_TOP = {
-    X : -.5,
-    Y : 1,
-    Z : 1,
+    X : CAMERA_LEFT_TOP_X + CAMERA_LEFT_TOP_CENTER_CORRECTION_X,
+    Y : CAMERA_LEFT_TOP_Y + CAMERA_LEFT_TOP_CENTER_CORRECTION_Y,
+    Z : CAMERA_LEFT_TOP_Z + CAMERA_LEFT_TOP_CENTER_CORRECTION_Z,
 
-    X_ANGLE : degToRad(120),
-    Y_ANGLE : degToRad(120),
-    Z_ANGLE : degToRad(120),
+    X_ANGLE : degToRad(CAMERA_LEFT_TOP_X_ANGLE),
+    Y_ANGLE : degToRad(CAMERA_LEFT_TOP_Y_ANGLE),
+    Z_ANGLE : degToRad(CAMERA_LEFT_TOP_Z_ANGLE),
 };
 
 const cameraOrientation RIGHT_TOP = {
-    X : -.5,
-    Y : 1,
-    Z : 1,
+    X : CAMERA_RIGHT_TOP_X + CAMERA_RIGHT_TOP_CENTER_CORRECTION_X,
+    Y : CAMERA_RIGHT_TOP_Y + CAMERA_RIGHT_TOP_CENTER_CORRECTION_Y,
+    Z : CAMERA_RIGHT_TOP_Z + CAMERA_RIGHT_TOP_CENTER_CORRECTION_Z,
 
-    X_ANGLE : degToRad(60),
-    Y_ANGLE : degToRad(60),
-    Z_ANGLE : degToRad(60),
+    X_ANGLE : degToRad(CAMERA_RIGHT_TOP_X_ANGLE),
+    Y_ANGLE : degToRad(CAMERA_RIGHT_TOP_Y_ANGLE),
+    Z_ANGLE : degToRad(CAMERA_RIGHT_TOP_Z_ANGLE),
 };
 
 const cameraOrientation CROP_BOX = {
-    X : -.5,
-    Y : 1,
-    Z : 1,
+    X : BOX_X,
+    Y : BOX_Y,
+    Z : BOX_Z,
 
-    X_ANGLE : degToRad(0),
-    Y_ANGLE : degToRad(0),
-    Z_ANGLE : degToRad(0),
+    X_ANGLE : degToRad(BOX_X_ANGLE),
+    Y_ANGLE : degToRad(BOX_Y_ANGLE),
+    Z_ANGLE : degToRad(BOX_Z_ANGLE),
 };
 
 
@@ -121,19 +124,27 @@ Eigen::Matrix3d getRotationalMatrix(cameraOrientation orientation) {
 void transformPointcloud(open3d::geometry::PointCloud &pointcloud, cameraOrientation orientation) {
     const Eigen::Matrix3d rMat = getRotationalMatrix(orientation);
     const Eigen::Vector3d center{0, 0, 0};
-    const Eigen::Vector3d translate{0, 0, 0};
+    const Eigen::Vector3d translate{orientation.X, orientation.Y, orientation.Z};
 
     pointcloud.Rotate(rMat, center);
     pointcloud.Translate(translate);
 }
 
-void filterObject(open3d::geometry::PointCloud *poinCloud) {
+std::shared_ptr<open3d::geometry::PointCloud> cropWorkspace(open3d::geometry::PointCloud &poinCloud) {
     const Eigen::Vector3d center{CROP_BOX.X, CROP_BOX.Y, CROP_BOX.Z};
-    const Eigen::Vector3d extent{30, 30, 30};
+    const Eigen::Vector3d extent{BOX_SIZE_X, BOX_SIZE_Y, BOX_SIZE_Z};
     const Eigen::Matrix3d rMat = getRotationalMatrix(CROP_BOX);
     const auto cropBox = open3d::geometry::OrientedBoundingBox(center, rMat, extent);
 
-    poinCloud->Crop(cropBox);
+    return poinCloud.Crop(cropBox);
+}
+
+std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> 
+filterObject(open3d::geometry::PointCloud &poinCloud) {
+    std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedData = 
+        poinCloud.VoxelDownSample(VOXEL_DOWN_SAMPLE)->RemoveRadiusOutliers(20, 0.5);
+    
+    return preProcessedData;
 }
 
 int main(int argc, char *argv[]) {
@@ -163,15 +174,27 @@ int main(int argc, char *argv[]) {
     }
 
     pointcloudRightTop->NormalizeNormals();
+    pointcloudLeftTop->NormalizeNormals();
 
     transformPointcloud(*pointcloudRightTop, RIGHT_TOP);
+    transformPointcloud(*pointcloudLeftTop, LEFT_TOP);
 
-    pointcloudRightTop = pointcloudRightTop->VoxelDownSample(0.005);
-    pointcloudLeftTop = pointcloudLeftTop->VoxelDownSample(0.005);
+    pointcloudRightTop = cropWorkspace(*pointcloudRightTop);
+    pointcloudLeftTop = cropWorkspace(*pointcloudLeftTop);
 
-    visualization::DrawGeometries({pointcloudRightTop}, "PointCloud", 1600, 900);
+    std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedRightTop =
+        filterObject(*pointcloudRightTop);
+    pointcloudRightTop = std::get<0>(preProcessedRightTop);
 
+    std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedLeftTop =
+        filterObject(*pointcloudLeftTop);
+    pointcloudLeftTop = std::get<0>(preProcessedLeftTop);
+
+    auto sphere = open3d::geometry::TriangleMesh::CreateSphere(.05);
+    sphere->ComputeVertexNormals();
+    sphere->PaintUniformColor({0.0, 1.0, 0.0});
+
+    visualization::DrawGeometries({pointcloudLeftTop, pointcloudRightTop, sphere}, "PointCloud", 1600, 900);
     utility::LogInfo("End of the test.");
-
     return 0;
 }
