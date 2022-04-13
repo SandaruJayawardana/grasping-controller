@@ -8,7 +8,7 @@
 /* Parameters */
 
 // Tunning parameters
-#define VOXEL_DOWN_SAMPLE 0.003
+#define VOXEL_DOWN_SAMPLE 0.002
 
 // Working area
 // In meters
@@ -17,7 +17,7 @@
 #define BOX_SIZE_Z 0.25
 // In meters
 #define BOX_X 0
-#define BOX_Y 0.11
+#define BOX_Y 0.13
 #define BOX_Z 0
 // In degree
 #define BOX_X_ANGLE 0
@@ -35,7 +35,7 @@
 #define CAMERA_RIGHT_TOP_Z_ANGLE 0
 // In meters
 #define CAMERA_RIGHT_TOP_CENTER_CORRECTION_X 0.55
-#define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Y 0.4
+#define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Y 0.42
 #define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Z 0.37
 
 
@@ -45,12 +45,12 @@
 #define CAMERA_LEFT_TOP_Y 0
 #define CAMERA_LEFT_TOP_Z 0
 // In degree
-#define CAMERA_LEFT_TOP_X_ANGLE -20
+#define CAMERA_LEFT_TOP_X_ANGLE -20.5
 #define CAMERA_LEFT_TOP_Y_ANGLE -60
 #define CAMERA_LEFT_TOP_Z_ANGLE 0
 // In meters
 #define CAMERA_LEFT_TOP_CENTER_CORRECTION_X -0.63
-#define CAMERA_LEFT_TOP_CENTER_CORRECTION_Y 0.4
+#define CAMERA_LEFT_TOP_CENTER_CORRECTION_Y 0.42
 #define CAMERA_LEFT_TOP_CENTER_CORRECTION_Z 0.26
 
 // Function signatures
@@ -142,7 +142,7 @@ std::shared_ptr<open3d::geometry::PointCloud> cropWorkspace(open3d::geometry::Po
 std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> 
 filterObject(open3d::geometry::PointCloud &poinCloud) {
     std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedData = 
-        poinCloud.VoxelDownSample(VOXEL_DOWN_SAMPLE)->RemoveRadiusOutliers(20, 0.5);
+        poinCloud.VoxelDownSample(VOXEL_DOWN_SAMPLE)->RemoveRadiusOutliers(20, 0.03, true);
     
     return preProcessedData;
 }
@@ -179,8 +179,8 @@ int main(int argc, char *argv[]) {
     transformPointcloud(*pointcloudRightTop, RIGHT_TOP);
     transformPointcloud(*pointcloudLeftTop, LEFT_TOP);
 
-    pointcloudRightTop = cropWorkspace(*pointcloudRightTop);
-    pointcloudLeftTop = cropWorkspace(*pointcloudLeftTop);
+    *pointcloudRightTop.get() = cropWorkspace(*pointcloudRightTop)->PaintUniformColor({1, 0, 0});
+    *pointcloudLeftTop.get() = cropWorkspace(*pointcloudLeftTop)->PaintUniformColor({0, 0, 1});
 
     std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedRightTop =
         filterObject(*pointcloudRightTop);
@@ -190,11 +190,17 @@ int main(int argc, char *argv[]) {
         filterObject(*pointcloudLeftTop);
     pointcloudLeftTop = std::get<0>(preProcessedLeftTop);
 
-    auto sphere = open3d::geometry::TriangleMesh::CreateSphere(.05);
+    auto sphere = open3d::geometry::TriangleMesh::CreateCone(.05, 0.05);
     sphere->ComputeVertexNormals();
     sphere->PaintUniformColor({0.0, 1.0, 0.0});
 
-    visualization::DrawGeometries({pointcloudLeftTop, pointcloudRightTop, sphere}, "PointCloud", 1600, 900);
+    *pointcloudLeftTop.get() += *pointcloudRightTop.get();
+    std::vector<double> radii = {0.02};
+
+    auto mesh = std::make_shared<geometry::TriangleMesh>();
+    // mesh = open3d::geometry::TriangleMesh::CreateFromPointCloudBallPivoting(*pointcloudLeftTop.get(), radii);
+    mesh->PaintUniformColor({1.0, 0.0, 0.0});
+    visualization::DrawGeometries({pointcloudLeftTop, mesh, sphere}, "PointCloud", 1600, 900);
     utility::LogInfo("End of the test.");
     return 0;
 }
