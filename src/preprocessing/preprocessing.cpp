@@ -8,7 +8,7 @@
 /* Parameters */
 
 // Tunning parameters
-#define VOXEL_DOWN_SAMPLE 0.002
+#define VOXEL_DOWN_SAMPLE 0.006
 
 // Working area
 // In meters
@@ -57,7 +57,7 @@
 float degToRad(float);
 
 // Data structures
-struct cameraOrientation {
+struct CameraOrientation {
     // In meter
     float X;
     float Y;
@@ -69,7 +69,15 @@ struct cameraOrientation {
     float Z_ANGLE;
 };
 
-const cameraOrientation LEFT_TOP = {
+struct OrganizedPointCloud {
+    int pointCloudNo;
+    Eigen::Vector3d points_;
+    Eigen::Vector3d normals_;
+    Eigen::Vector3d colors_;
+    // Eigen::Matrix3d covariances_;
+};
+
+const CameraOrientation LEFT_TOP = {
     X : CAMERA_LEFT_TOP_X + CAMERA_LEFT_TOP_CENTER_CORRECTION_X,
     Y : CAMERA_LEFT_TOP_Y + CAMERA_LEFT_TOP_CENTER_CORRECTION_Y,
     Z : CAMERA_LEFT_TOP_Z + CAMERA_LEFT_TOP_CENTER_CORRECTION_Z,
@@ -79,7 +87,7 @@ const cameraOrientation LEFT_TOP = {
     Z_ANGLE : degToRad(CAMERA_LEFT_TOP_Z_ANGLE),
 };
 
-const cameraOrientation RIGHT_TOP = {
+const CameraOrientation RIGHT_TOP = {
     X : CAMERA_RIGHT_TOP_X + CAMERA_RIGHT_TOP_CENTER_CORRECTION_X,
     Y : CAMERA_RIGHT_TOP_Y + CAMERA_RIGHT_TOP_CENTER_CORRECTION_Y,
     Z : CAMERA_RIGHT_TOP_Z + CAMERA_RIGHT_TOP_CENTER_CORRECTION_Z,
@@ -89,7 +97,7 @@ const cameraOrientation RIGHT_TOP = {
     Z_ANGLE : degToRad(CAMERA_RIGHT_TOP_Z_ANGLE),
 };
 
-const cameraOrientation CROP_BOX = {
+const CameraOrientation CROP_BOX = {
     X : BOX_X,
     Y : BOX_Y,
     Z : BOX_Z,
@@ -102,7 +110,7 @@ const cameraOrientation CROP_BOX = {
 
 float degToRad(float degree) { return degree * (M_PI / 180); }
 
-Eigen::Matrix3d getRotationalMatrix(cameraOrientation orientation) {
+Eigen::Matrix3d getRotationalMatrix(CameraOrientation orientation) {
     Eigen::Matrix3d rMat{{cos(orientation.Z_ANGLE) * cos(orientation.Y_ANGLE),
                                 cos(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * sin(orientation.X_ANGLE) -
                                         sin(orientation.Z_ANGLE) * cos(orientation.X_ANGLE),
@@ -121,7 +129,7 @@ Eigen::Matrix3d getRotationalMatrix(cameraOrientation orientation) {
     return rMat;
 }
 
-void transformPointcloud(open3d::geometry::PointCloud &pointcloud, cameraOrientation orientation) {
+void transformPointcloud(open3d::geometry::PointCloud &pointcloud, CameraOrientation orientation) {
     const Eigen::Matrix3d rMat = getRotationalMatrix(orientation);
     const Eigen::Vector3d center{0, 0, 0};
     const Eigen::Vector3d translate{orientation.X, orientation.Y, orientation.Z};
@@ -173,8 +181,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    pointcloudRightTop->NormalizeNormals();
-    pointcloudLeftTop->NormalizeNormals();
+    
 
     transformPointcloud(*pointcloudRightTop, RIGHT_TOP);
     transformPointcloud(*pointcloudLeftTop, LEFT_TOP);
@@ -200,7 +207,17 @@ int main(int argc, char *argv[]) {
     auto mesh = std::make_shared<geometry::TriangleMesh>();
     // mesh = open3d::geometry::TriangleMesh::CreateFromPointCloudBallPivoting(*pointcloudLeftTop.get(), radii);
     mesh->PaintUniformColor({1.0, 0.0, 0.0});
-    visualization::DrawGeometries({pointcloudLeftTop, mesh, sphere}, "PointCloud", 1600, 900);
-    utility::LogInfo("End of the test.");
+    // visualization::DrawGeometries({pointcloudLeftTop, mesh, sphere}, "PointCloud", 1600, 900);
+
+    pointcloudRightTop->EstimateNormals();
+    pointcloudRightTop->NormalizeNormals();
+    pointcloudLeftTop->EstimateNormals();
+    pointcloudLeftTop->NormalizeNormals();
+
+    visualization::DrawGeometries({pointcloudRightTop, pointcloudLeftTop}, "PointCloud", 1600, 900, 50, 50, true);
+
+    std::map<Eigen::Vector3d, OrganizedPointCloud> organizedPointMap;
+    // <coordinate, OrganizedPointCloud>
+
     return 0;
 }
