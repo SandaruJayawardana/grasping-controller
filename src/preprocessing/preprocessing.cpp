@@ -53,6 +53,10 @@
 #define CAMERA_LEFT_TOP_CENTER_CORRECTION_Y 0.42
 #define CAMERA_LEFT_TOP_CENTER_CORRECTION_Z 0.26
 
+// Properties of Organized Points
+#define GRID_SIZE 5 // In milimeter
+#define GRID_SIZE_HALF 2.5
+
 // Function signatures
 float degToRad(float);
 
@@ -155,6 +159,27 @@ filterObject(open3d::geometry::PointCloud &poinCloud) {
     return preProcessedData;
 }
 
+void reorderPointCloud(std::map<Eigen::Vector3d, OrganizedPointCloud> *organizedPointMap, open3d::geometry::PointCloud &poinCloud) {
+    for(int i; i < poinCloud.points_.size(); i++) {
+        Eigen::Vector3d coordinate = poinCloud.points_[i];
+        coordinate[0] = (((int) (coordinate[0] * 1000)) / GRID_SIZE + GRID_SIZE_HALF) / 1000.0;
+        coordinate[1] = (((int) (coordinate[1] * 1000)) / GRID_SIZE + GRID_SIZE_HALF) / 1000.0;
+        coordinate[2] = (((int) (coordinate[2] * 1000)) / GRID_SIZE + GRID_SIZE_HALF) / 1000.0;
+
+        auto iterator = organizedPointMap->find(coordinate);
+        if (iterator != organizedPointMap->end()) {
+            // not present
+            OrganizedPointCloud newOrganizedPointCloud;
+            newOrganizedPointCloud.points_ = coordinate;
+            newOrganizedPointCloud.colors_ = poinCloud.colors_[i];
+            newOrganizedPointCloud.normals_ = poinCloud.normals_[i];
+            organizedPointMap->insert({coordinate, newOrganizedPointCloud});
+        }
+        OrganizedPointCloud newOrganizedPointCloud;
+
+    }
+}
+
 int main(int argc, char *argv[]) {
     using namespace open3d;
 
@@ -218,6 +243,8 @@ int main(int argc, char *argv[]) {
 
     std::map<Eigen::Vector3d, OrganizedPointCloud> organizedPointMap;
     // <coordinate, OrganizedPointCloud>
+
+    reorderPointCloud(&organizedPointMap, *pointcloudLeftTop);
 
     return 0;
 }
