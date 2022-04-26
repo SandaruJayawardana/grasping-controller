@@ -8,7 +8,7 @@
 /* Parameters */
 
 // Tunning parameters
-#define VOXEL_DOWN_SAMPLE 0.005
+#define VOXEL_DOWN_SAMPLE 0.009
 
 // Working area
 // In meters
@@ -188,7 +188,11 @@ void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCl
     std::cout << "Total Points " << (*organizedPointMap).size() << "\n";
     for (auto i= (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
         poinCloud.points_.push_back((i -> second).points_);
-        poinCloud.colors_.push_back((i -> second).colors_);
+        Eigen::Vector3d vector3d;
+        vector3d[0] = (1 + (i -> second).normals_[0]) ;
+        vector3d[1] = (1 + (i -> second).normals_[1]) ;
+        vector3d[2] = (1 + (i -> second).normals_[2]) ;
+        poinCloud.colors_.push_back(vector3d);
         poinCloud.normals_.push_back((i -> second).normals_);
     }
 }
@@ -263,12 +267,12 @@ int main(int argc, char *argv[]) {
 
     pointcloudLeftTop->PaintUniformColor({0, 1, 0});
 
-    std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> aaa =
-        filterObject(*pointcloudreorder);
-    pointcloudreorder = std::get<0>(aaa);
+    // std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> aaa =
+    //     filterObject(*pointcloudreorder);
+    // pointcloudreorder = std::get<0>(aaa);
 
-    //  mesh = open3d::geometry::TriangleMesh::CreateFromPointCloudBallPivoting(*pointcloudreorder.get(), radii);
-    visualization::DrawGeometries({pointcloudreorder, mesh}, "PointCloud", 1600, 900, 50, 50, false);
+    // mesh = open3d::geometry::TriangleMesh::CreateFromPointCloudBallPivoting(*pointcloudreorder.get(), radii);
+    visualization::DrawGeometries({pointcloudreorder, mesh}, "PointCloud", 1600, 900, 50, 50, false, true, true);
 
     return 0;
 }
