@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <thread>
 
@@ -8,7 +9,7 @@
 /* Parameters */
 
 // Tunning parameters
-#define VOXEL_DOWN_SAMPLE 0.009
+#define VOXEL_DOWN_SAMPLE 0.002
 
 // Working area
 // In meters
@@ -38,7 +39,6 @@
 #define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Y 0.42
 #define CAMERA_RIGHT_TOP_CENTER_CORRECTION_Z 0.37
 
-
 // Camera Left Top
 // In meters
 #define CAMERA_LEFT_TOP_X 0
@@ -54,8 +54,9 @@
 #define CAMERA_LEFT_TOP_CENTER_CORRECTION_Z 0.26
 
 // Properties of Organized Points
-#define GRID_SIZE 1 // In milimeter
+#define GRID_SIZE 1  // In milimeter
 #define GRID_SIZE_HALF 0.5
+#define NEIGHBOUR_SIZE 5
 
 // Function signatures
 float degToRad(float);
@@ -73,12 +74,37 @@ struct CameraOrientation {
     float Z_ANGLE;
 };
 
+struct PlaneOrientation {
+    // In radian
+    float X_ANGLE;
+    float Y_ANGLE;
+    float Z_ANGLE;
+};
+
 struct OrganizedPointCloud {
     int pointCloudNo;
     Eigen::Vector3d points_;
     Eigen::Vector3d normals_;
     Eigen::Vector3d colors_;
     // Eigen::Matrix3d covariances_;
+
+    // neighbour points
+    Eigen::Vector3d l_point_;
+    Eigen::Vector3d r_point_;
+    Eigen::Vector3d u_point_;
+    Eigen::Vector3d d_point_;
+
+    // flags
+    bool is_edge_;
+    bool is_searched;
+
+    Eigen::Vector3d edge_colors_;
+
+    // gradient values
+    Eigen::Vector3d r_horizontal_grad;
+    Eigen::Vector3d l_horizontal_grad;
+    Eigen::Vector3d u_vertical_grad;
+    Eigen::Vector3d d_vertical_grad;
 };
 
 const CameraOrientation LEFT_TOP = {
@@ -111,25 +137,24 @@ const CameraOrientation CROP_BOX = {
     Z_ANGLE : degToRad(BOX_Z_ANGLE),
 };
 
-
 float degToRad(float degree) { return degree * (M_PI / 180); }
 
 Eigen::Matrix3d getRotationalMatrix(CameraOrientation orientation) {
     Eigen::Matrix3d rMat{{cos(orientation.Z_ANGLE) * cos(orientation.Y_ANGLE),
-                                cos(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * sin(orientation.X_ANGLE) -
-                                        sin(orientation.Z_ANGLE) * cos(orientation.X_ANGLE),
-                                cos(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * cos(orientation.X_ANGLE) +
-                                        sin(orientation.Z_ANGLE) * sin(orientation.X_ANGLE)},
+                          cos(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * sin(orientation.X_ANGLE) -
+                                  sin(orientation.Z_ANGLE) * cos(orientation.X_ANGLE),
+                          cos(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * cos(orientation.X_ANGLE) +
+                                  sin(orientation.Z_ANGLE) * sin(orientation.X_ANGLE)},
 
-                               {sin(orientation.Z_ANGLE) * cos(orientation.Y_ANGLE),
-                                sin(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * sin(orientation.X_ANGLE) +
-                                        cos(orientation.Z_ANGLE) * cos(orientation.X_ANGLE),
-                                sin(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * cos(orientation.X_ANGLE) -
-                                        cos(orientation.Z_ANGLE) * sin(orientation.X_ANGLE)},
+                         {sin(orientation.Z_ANGLE) * cos(orientation.Y_ANGLE),
+                          sin(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * sin(orientation.X_ANGLE) +
+                                  cos(orientation.Z_ANGLE) * cos(orientation.X_ANGLE),
+                          sin(orientation.Z_ANGLE) * sin(orientation.Y_ANGLE) * cos(orientation.X_ANGLE) -
+                                  cos(orientation.Z_ANGLE) * sin(orientation.X_ANGLE)},
 
-                               {-sin(orientation.Y_ANGLE), cos(orientation.Y_ANGLE) * sin(orientation.X_ANGLE),
-                                cos(orientation.Y_ANGLE) * cos(orientation.X_ANGLE)}};
-    
+                         {-sin(orientation.Y_ANGLE), cos(orientation.Y_ANGLE) * sin(orientation.X_ANGLE),
+                          cos(orientation.Y_ANGLE) * cos(orientation.X_ANGLE)}};
+
     return rMat;
 }
 
@@ -151,50 +176,114 @@ std::shared_ptr<open3d::geometry::PointCloud> cropWorkspace(open3d::geometry::Po
     return poinCloud.Crop(cropBox);
 }
 
-std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> 
-filterObject(open3d::geometry::PointCloud &poinCloud) {
-    std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedData = 
-        poinCloud.VoxelDownSample(VOXEL_DOWN_SAMPLE)->RemoveRadiusOutliers(20, 0.03, true);
-    
+std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> filterObject(
+        open3d::geometry::PointCloud &poinCloud) {
+    std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> preProcessedData =
+            poinCloud.VoxelDownSample(VOXEL_DOWN_SAMPLE)->RemoveRadiusOutliers(20, 0.03, true);
+
     return preProcessedData;
 }
 
-void reorderPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, open3d::geometry::PointCloud &poinCloud) {
+void initNewOrganizedPoint(OrganizedPointCloud *organizedPoint) {
+    Eigen::Vector3d initVector;
+    initVector[0] = std::numeric_limits<int>::min();
+    initVector[1] = std::numeric_limits<int>::min();
+    initVector[2] = std::numeric_limits<int>::min();
+    (*organizedPoint).l_horizontal_grad = initVector;
+    (*organizedPoint).r_horizontal_grad = initVector;
+    (*organizedPoint).u_vertical_grad = initVector;
+    (*organizedPoint).d_vertical_grad = initVector;
+
+    (*organizedPoint).l_point_ = initVector;
+    (*organizedPoint).r_point_ = initVector;
+    (*organizedPoint).u_point_ = initVector;
+    (*organizedPoint).d_point_ = initVector;
+
+    (*organizedPoint).is_edge_ = false;
+    (*organizedPoint).is_searched = false;
+    (*organizedPoint).edge_colors_ = {0, 0, 0};
+}
+
+void reorderPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                       open3d::geometry::PointCloud &poinCloud,
+                       Eigen::Vector3d *startPoint) {
     std::cout << poinCloud.points_.size() << "\n";
-    for(int i = 0; i < poinCloud.points_.size(); i++) {
-        
-        std::tuple<float, float, float> coordinate = {poinCloud.points_[i][0], poinCloud.points_[i][1], poinCloud.points_[i][2]};
-        std::get<0>(coordinate) = ((((int) (std::get<0>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE + GRID_SIZE_HALF) / 1000.0;
-        std::get<1>(coordinate) = ((((int) (std::get<1>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE + GRID_SIZE_HALF) / 1000.0;
-        std::get<2>(coordinate) = ((((int) (std::get<2>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE + GRID_SIZE_HALF) / 1000.0;
+    for (int i = 0; i < poinCloud.points_.size(); i++) {
+        std::tuple<float, float, float> coordinate = {poinCloud.points_[i][0], poinCloud.points_[i][1],
+                                                      poinCloud.points_[i][2]};
+        std::get<0>(coordinate) = ((((int)(std::get<0>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
+        std::get<1>(coordinate) = ((((int)(std::get<1>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
+        std::get<2>(coordinate) = ((((int)(std::get<2>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
         auto iterator = organizedPointMap->find(coordinate);
         if (iterator == (*organizedPointMap).end()) {
             // not present
             OrganizedPointCloud newOrganizedPointCloud;
-            Eigen::Vector3d vector3d;
-            vector3d[0] = std::get<0>(coordinate);
-            vector3d[1] = std::get<1>(coordinate);
-            vector3d[2] = std::get<2>(coordinate);
-            newOrganizedPointCloud.points_ = vector3d;
+
+            newOrganizedPointCloud.points_ = poinCloud.points_[i];  // vector3d;
             newOrganizedPointCloud.colors_ = poinCloud.colors_[i];
             newOrganizedPointCloud.normals_ = poinCloud.normals_[i];
-            (*organizedPointMap)[coordinate] = newOrganizedPointCloud;
-            (*organizedPointMap).insert(std::pair<const std::tuple<float, float, float>, OrganizedPointCloud>(coordinate, newOrganizedPointCloud));
+            initNewOrganizedPoint(&newOrganizedPointCloud);
+
+            (*organizedPointMap)
+                    .insert(std::pair<const std::tuple<float, float, float>, OrganizedPointCloud>(
+                            coordinate, newOrganizedPointCloud));
+
+            if ((*startPoint)[0] > std::get<0>(coordinate) && (*startPoint)[1] > std::get<1>(coordinate) &&
+                (*startPoint)[2] > std::get<2>(coordinate)) {
+                (*startPoint)[0] = std::get<0>(coordinate);
+                (*startPoint)[1] = std::get<1>(coordinate);
+                (*startPoint)[2] = std::get<2>(coordinate);
+            }
+        } else {
+            Eigen::Vector3d vector3d;
+            vector3d[0] = poinCloud.points_[i][0];
+            vector3d[1] = poinCloud.points_[i][1];
+            vector3d[2] = poinCloud.points_[i][2];
+            (iterator->second).points_ = ((iterator->second).points_ + vector3d) / 2;
         }
     }
 }
 
-void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, open3d::geometry::PointCloud &poinCloud) {
+void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                      open3d::geometry::PointCloud &poinCloud) {
     std::cout << "Total Points " << (*organizedPointMap).size() << "\n";
-    for (auto i= (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
-        poinCloud.points_.push_back((i -> second).points_);
+    for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
+        poinCloud.points_.push_back((i->second).points_);
         Eigen::Vector3d vector3d;
-        vector3d[0] = (1 + (i -> second).normals_[0]) ;
-        vector3d[1] = (1 + (i -> second).normals_[1]) ;
-        vector3d[2] = (1 + (i -> second).normals_[2]) ;
-        poinCloud.colors_.push_back(vector3d);
-        poinCloud.normals_.push_back((i -> second).normals_);
+        vector3d[0] = ((i->second).points_[0]);
+        vector3d[1] = (1 + (i->second).points_[1]);
+        vector3d[2] = (1 + (i->second).points_[2]);
+        poinCloud.colors_.push_back((i->second).colors_);
+        poinCloud.normals_.push_back((i->second).normals_);
     }
+}
+
+// void sliceObject(open3d::geometry::PointCloud &poinCloud, )
+
+void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) { 
+    Eigen::Vector3d startPoint = *point; 
+    
+    std::cout << "Scanning Points" << (*organizedPointMap).size() << "\n";
+    for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
+        if ((i->second).is_searched) {
+            continue;
+        }
+
+        // precedence R -> L -> D -> U
+        
+    }
+}
+
+bool getUpperVerticalPoint(open3d::geometry::PointCloud &poinCloud, OrganizedPointCloud *currentPoint, Eigen::Vector3d *resultantPoint) {
+
+}
+
+bool getLeftHorizontalPoint(open3d::geometry::PointCloud &poinCloud, OrganizedPointCloud *currentPoint, Eigen::Vector3d *resultantPoint) {
+
+}
+
+bool getRightHorizontalPoint(open3d::geometry::PointCloud &poinCloud, OrganizedPointCloud *currentPoint, Eigen::Vector3d *resultantPoint) {
+
 }
 
 int main(int argc, char *argv[]) {
@@ -222,8 +311,6 @@ int main(int argc, char *argv[]) {
         utility::LogWarning("Failed to read {}", argv[2]);
         return 1;
     }
-
-    
 
     transformPointcloud(*pointcloudRightTop, RIGHT_TOP);
     transformPointcloud(*pointcloudLeftTop, LEFT_TOP);
@@ -256,12 +343,13 @@ int main(int argc, char *argv[]) {
     pointcloudLeftTop->EstimateNormals();
     pointcloudLeftTop->NormalizeNormals();
 
-    
-
     std::map<std::tuple<float, float, float>, OrganizedPointCloud> organizedPointMap;
     // <coordinate, OrganizedPointCloud>
-
-    reorderPointCloud(&organizedPointMap, *pointcloudLeftTop);
+    Eigen::Vector3d startPoint;
+    startPoint[0] = std::numeric_limits<int>::max();
+    startPoint[1] = std::numeric_limits<int>::max();
+    startPoint[2] = std::numeric_limits<int>::max();
+    reorderPointCloud(&organizedPointMap, *pointcloudLeftTop, &startPoint);
     auto pointcloudreorder = std::make_shared<geometry::PointCloud>();
     createPointCloud(&organizedPointMap, *pointcloudreorder);
 
@@ -274,5 +362,6 @@ int main(int argc, char *argv[]) {
     // mesh = open3d::geometry::TriangleMesh::CreateFromPointCloudBallPivoting(*pointcloudreorder.get(), radii);
     visualization::DrawGeometries({pointcloudreorder, mesh}, "PointCloud", 1600, 900, 50, 50, false, true, true);
 
+    std::cout << "\n" << startPoint[0] << " " << startPoint[1] << " " << startPoint[2] << "\n";
     return 0;
 }
