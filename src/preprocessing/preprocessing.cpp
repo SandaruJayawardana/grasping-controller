@@ -107,6 +107,8 @@ struct OrganizedPointCloud {
     Eigen::Vector3d d_vertical_grad;
 };
 
+enum NEIGHBOUR_DIR {UP, DOWN, LEFT, RIGHT};
+
 const CameraOrientation LEFT_TOP = {
     X : CAMERA_LEFT_TOP_X + CAMERA_LEFT_TOP_CENTER_CORRECTION_X,
     Y : CAMERA_LEFT_TOP_Y + CAMERA_LEFT_TOP_CENTER_CORRECTION_Y,
@@ -259,36 +261,31 @@ void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCl
 
 
 bool getUpperVerticalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                           const std::tuple<float, float, float> *currentPoint,
-                           Eigen::Vector3d *resultantPoint, OrganizedPointCloud *rRealCoordinate) {}
+                            std::tuple<float, float, float> *currentPoint,
+                           std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate) {}
 
 bool getLeftHorizontalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                            const std::tuple<float, float, float> *currentPoint,
-                            Eigen::Vector3d *resultantPoint, OrganizedPointCloud *rRealCoordinate) {}
+                            std::tuple<float, float, float> *currentPoint,
+                            std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate) {}
 
 bool getRightHorizontalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                            const std::tuple<float, float, float> *currentPoint,
-                            Eigen::Vector3d *resultantPoint, OrganizedPointCloud *rRealCoordinate) {}
+                            std::tuple<float, float, float> *currentPoint,
+                            std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate) {}
 
+bool getNeighbourPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                            std::tuple<float, float, float> *currentPoint,
+                            std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate, NEIGHBOUR_DIR dir) {
+    switch (dir)
+    {
+    case UP:
+        /* code */
+        break;
+    
+    default:
+        break;
+    }
 
-void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) {
-    Eigen::Vector3d startPoint = *point;
-
-    std::cout << "Scanning Points" << (*organizedPointMap).size() << "\n";
-    for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
-        if ((i->second).is_searched) {
-            continue;
-        }
-
-        // precedence R -> L -> D -> U
-
-        // horizontal right search
-        Eigen::Vector3d rGridCoordinate;
-        OrganizedPointCloud *rRealCoordinate;
-        Eigen::Vector3d rInitialGrad;
-        std::tuple<float, float, float> *currentCoordinate = &(i->first);
-        rInitialGrad.setZero();
-        while (getRightHorizontalPoint(organizedPointMap, , &rGridCoordinate, rRealCoordinate)) {
+    while (getRightHorizontalPoint(organizedPointMap, &currentCoordinate, &rGridCoordinate, rRealCoordinate)) {
             Eigen::Vector3d unitDirectionalVector = (rRealCoordinate->points_ - (i->second).points_);
             unitDirectionalVector.normalize();
 
@@ -309,7 +306,34 @@ void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organi
 
             (i->second).r_horizontal_grad = unitDirectionalVector;
             (*rRealCoordinate).l_horizontal_grad = unitDirectionalVector;
+
+            currentCoordinate = rGridCoordinate;
         }
+}
+void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) {
+    Eigen::Vector3d startPoint = *point;
+
+    std::cout << "Scanning Points" << (*organizedPointMap).size() << "\n";
+    for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
+        if ((i->second).is_searched) {
+            continue;
+        }
+
+        // precedence R -> L -> D -> U
+
+        // horizontal right search
+        std::tuple<float, float, float> rGridCoordinate;
+        OrganizedPointCloud *rRealCoordinate;
+        Eigen::Vector3d rInitialGrad;
+        rInitialGrad.setZero();
+
+        std::tuple<float, float, float> currentCoordinate;
+        std::get<0>(currentCoordinate) = std::get<0>(i->first);
+        std::get<1>(currentCoordinate) = std::get<1>(i->first);
+        std::get<1>(currentCoordinate) = std::get<2>(i->first);
+        
+
+        
     }
 }
 
