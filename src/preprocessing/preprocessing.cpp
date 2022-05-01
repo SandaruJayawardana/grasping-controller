@@ -185,19 +185,16 @@ std::tuple<std::shared_ptr<open3d::geometry::PointCloud>, std::vector<size_t>> f
 }
 
 void initNewOrganizedPoint(OrganizedPointCloud *organizedPoint) {
-    Eigen::Vector3d initVector;
-    initVector[0] = std::numeric_limits<int>::min();
-    initVector[1] = std::numeric_limits<int>::min();
-    initVector[2] = std::numeric_limits<int>::min();
-    (*organizedPoint).l_horizontal_grad = initVector;
-    (*organizedPoint).r_horizontal_grad = initVector;
-    (*organizedPoint).u_vertical_grad = initVector;
-    (*organizedPoint).d_vertical_grad = initVector;
+    // Eigen::Vector3d initVector = {0, 0, 0};
+    (*organizedPoint).l_horizontal_grad.setZero();
+    (*organizedPoint).r_horizontal_grad.setZero();
+    (*organizedPoint).u_vertical_grad.setZero();
+    (*organizedPoint).d_vertical_grad.setZero();
 
-    (*organizedPoint).l_point_ = initVector;
-    (*organizedPoint).r_point_ = initVector;
-    (*organizedPoint).u_point_ = initVector;
-    (*organizedPoint).d_point_ = initVector;
+    (*organizedPoint).l_point_.setZero();
+    (*organizedPoint).r_point_.setZero();
+    (*organizedPoint).u_point_.setZero();
+    (*organizedPoint).d_point_.setZero();
 
     (*organizedPoint).is_edge_ = false;
     (*organizedPoint).is_searched = false;
@@ -260,9 +257,23 @@ void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCl
 
 // void sliceObject(open3d::geometry::PointCloud &poinCloud, )
 
-void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) { 
-    Eigen::Vector3d startPoint = *point; 
-    
+
+bool getUpperVerticalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                           const std::tuple<float, float, float> *currentPoint,
+                           Eigen::Vector3d *resultantPoint, OrganizedPointCloud *rRealCoordinate) {}
+
+bool getLeftHorizontalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                            const std::tuple<float, float, float> *currentPoint,
+                            Eigen::Vector3d *resultantPoint, OrganizedPointCloud *rRealCoordinate) {}
+
+bool getRightHorizontalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                            const std::tuple<float, float, float> *currentPoint,
+                            Eigen::Vector3d *resultantPoint, OrganizedPointCloud *rRealCoordinate) {}
+
+
+void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) {
+    Eigen::Vector3d startPoint = *point;
+
     std::cout << "Scanning Points" << (*organizedPointMap).size() << "\n";
     for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
         if ((i->second).is_searched) {
@@ -270,21 +281,38 @@ void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organi
         }
 
         // precedence R -> L -> D -> U
-        
+
+        // horizontal right search
+        Eigen::Vector3d rGridCoordinate;
+        OrganizedPointCloud *rRealCoordinate;
+        Eigen::Vector3d rInitialGrad;
+        std::tuple<float, float, float> *currentCoordinate = &(i->first);
+        rInitialGrad.setZero();
+        while (getRightHorizontalPoint(organizedPointMap, , &rGridCoordinate, rRealCoordinate)) {
+            Eigen::Vector3d unitDirectionalVector = (rRealCoordinate->points_ - (i->second).points_);
+            unitDirectionalVector.normalize();
+
+            if (rInitialGrad == ((Eigen::Vector3d) {0, 0, 0})) {
+                rInitialGrad = unitDirectionalVector;
+            }
+
+            float dotProduct = unitDirectionalVector.dot(rInitialGrad);
+
+            if (dotProduct < 0.6) {
+                rInitialGrad = unitDirectionalVector;
+                (i->second).is_edge_ = true;
+                (i->second).edge_colors_ = {0, 1, 0}; // green
+            } else if ((i->second).l_horizontal_grad != ((Eigen::Vector3d) {0, 0, 0})) {
+                unitDirectionalVector = ((i->second).l_horizontal_grad + unitDirectionalVector);
+                unitDirectionalVector.normalize();
+            }
+
+            (i->second).r_horizontal_grad = unitDirectionalVector;
+            (*rRealCoordinate).l_horizontal_grad = unitDirectionalVector;
+        }
     }
 }
 
-bool getUpperVerticalPoint(open3d::geometry::PointCloud &poinCloud, OrganizedPointCloud *currentPoint, Eigen::Vector3d *resultantPoint) {
-
-}
-
-bool getLeftHorizontalPoint(open3d::geometry::PointCloud &poinCloud, OrganizedPointCloud *currentPoint, Eigen::Vector3d *resultantPoint) {
-
-}
-
-bool getRightHorizontalPoint(open3d::geometry::PointCloud &poinCloud, OrganizedPointCloud *currentPoint, Eigen::Vector3d *resultantPoint) {
-
-}
 
 int main(int argc, char *argv[]) {
     using namespace open3d;
