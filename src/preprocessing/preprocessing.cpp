@@ -107,7 +107,7 @@ struct OrganizedPointCloud {
     Eigen::Vector3d d_vertical_grad;
 };
 
-enum NEIGHBOUR_DIR {UP, DOWN, LEFT, RIGHT};
+enum NEIGHBOUR_DIR { UP, DOWN, LEFT, RIGHT };
 
 const CameraOrientation LEFT_TOP = {
     X : CAMERA_LEFT_TOP_X + CAMERA_LEFT_TOP_CENTER_CORRECTION_X,
@@ -259,57 +259,89 @@ void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCl
 
 // void sliceObject(open3d::geometry::PointCloud &poinCloud, )
 
+bool getUpVerticalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                        std::tuple<float, float, float> *currentPoint,
+                        std::tuple<float, float, float> *resultantGridPoint,
+                        OrganizedPointCloud *rRealCoordinate) {}
 
-bool getUpperVerticalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                            std::tuple<float, float, float> *currentPoint,
-                           std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate) {}
+bool getDownVerticalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                          std::tuple<float, float, float> *currentPoint,
+                          std::tuple<float, float, float> *resultantGridPoint,
+                          OrganizedPointCloud *rRealCoordinate) {}
 
 bool getLeftHorizontalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
                             std::tuple<float, float, float> *currentPoint,
-                            std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate) {}
+                            std::tuple<float, float, float> *resultantGridPoint,
+                            OrganizedPointCloud *rRealCoordinate) {}
 
 bool getRightHorizontalPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                            std::tuple<float, float, float> *currentPoint,
-                            std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate) {}
+                             std::tuple<float, float, float> *currentPoint,
+                             std::tuple<float, float, float> *resultantGridPoint,
+                             OrganizedPointCloud *rRealCoordinate) {}
 
 bool getNeighbourPoint(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                            std::tuple<float, float, float> *currentPoint,
-                            std::tuple<float, float, float> *resultantGridPoint, OrganizedPointCloud *rRealCoordinate, NEIGHBOUR_DIR dir) {
-    switch (dir)
-    {
-    case UP:
-        /* code */
-        break;
-    
-    default:
-        break;
-    }
+                       std::tuple<float, float, float> *currentCoordinate,
+                       OrganizedPointCloud *rRealCoordinate,
+                       std::tuple<float, float, float> *rGridCoordinate,
+                       Eigen::Vector3d *rInitialGrad,
+                       NEIGHBOUR_DIR dir) {
+    auto iterator = organizedPointMap->find(*currentCoordinate);
+    bool isFoundNeighbour;
 
-    while (getRightHorizontalPoint(organizedPointMap, &currentCoordinate, &rGridCoordinate, rRealCoordinate)) {
-            Eigen::Vector3d unitDirectionalVector = (rRealCoordinate->points_ - (i->second).points_);
-            unitDirectionalVector.normalize();
+    while (true) {
+        switch (dir) {
+            case UP:
+                isFoundNeighbour =
+                        getUpVerticalPoint(organizedPointMap, currentCoordinate, rGridCoordinate, rRealCoordinate);
+                break;
 
-            if (rInitialGrad == ((Eigen::Vector3d) {0, 0, 0})) {
-                rInitialGrad = unitDirectionalVector;
-            }
+            case DOWN:
+                isFoundNeighbour =
+                        getDownVerticalPoint(organizedPointMap, currentCoordinate, rGridCoordinate, rRealCoordinate);
+                break;
 
-            float dotProduct = unitDirectionalVector.dot(rInitialGrad);
+            case LEFT:
+                isFoundNeighbour =
+                        getLeftHorizontalPoint(organizedPointMap, currentCoordinate, rGridCoordinate, rRealCoordinate);
+                break;
 
-            if (dotProduct < 0.6) {
-                rInitialGrad = unitDirectionalVector;
-                (i->second).is_edge_ = true;
-                (i->second).edge_colors_ = {0, 1, 0}; // green
-            } else if ((i->second).l_horizontal_grad != ((Eigen::Vector3d) {0, 0, 0})) {
-                unitDirectionalVector = ((i->second).l_horizontal_grad + unitDirectionalVector);
-                unitDirectionalVector.normalize();
-            }
+            case RIGHT:
+                isFoundNeighbour =
+                        getRightHorizontalPoint(organizedPointMap, currentCoordinate, rGridCoordinate, rRealCoordinate);
+                break;
 
-            (i->second).r_horizontal_grad = unitDirectionalVector;
-            (*rRealCoordinate).l_horizontal_grad = unitDirectionalVector;
-
-            currentCoordinate = rGridCoordinate;
+            default:
+                return false;
         }
+        if (!isFoundNeighbour) {
+            return false;
+        }
+
+        Eigen::Vector3d unitDirectionalVector = (rRealCoordinate->points_ - (iterator->second).points_);
+        unitDirectionalVector.normalize();
+
+        if ((*rInitialGrad) == ((Eigen::Vector3d){0, 0, 0})) {
+            (*rInitialGrad) = unitDirectionalVector;
+        }
+
+        float dotProduct = unitDirectionalVector.dot(*rInitialGrad);
+
+        if (dotProduct < 0.6) {
+            (*rInitialGrad) = unitDirectionalVector;
+            (iterator->second).is_edge_ = true;
+            (iterator->second).edge_colors_ = {0, 1, 0};  // green
+        } else if ((iterator->second).l_horizontal_grad != ((Eigen::Vector3d){0, 0, 0})) {
+            unitDirectionalVector = ((iterator->second).l_horizontal_grad + unitDirectionalVector);
+            unitDirectionalVector.normalize();
+        }
+
+        (iterator->second).r_horizontal_grad = unitDirectionalVector;
+        (*rRealCoordinate).l_horizontal_grad = unitDirectionalVector;
+
+        (*currentCoordinate) = *rGridCoordinate;
+    }
 }
+
 void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) {
     Eigen::Vector3d startPoint = *point;
 
@@ -331,12 +363,11 @@ void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organi
         std::get<0>(currentCoordinate) = std::get<0>(i->first);
         std::get<1>(currentCoordinate) = std::get<1>(i->first);
         std::get<1>(currentCoordinate) = std::get<2>(i->first);
-        
 
-        
+        getNeighbourPoint(organizedPointMap, &currentCoordinate, rRealCoordinate, &rGridCoordinate, &rInitialGrad,
+                          RIGHT);
     }
 }
-
 
 int main(int argc, char *argv[]) {
     using namespace open3d;
