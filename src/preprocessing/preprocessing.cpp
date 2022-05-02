@@ -56,7 +56,7 @@
 // Properties of Organized Points
 #define GRID_SIZE 1  // In milimeter
 #define GRID_SIZE_HALF 0.5
-#define NEIGHBOUR_SIZE 50
+#define NEIGHBOUR_SIZE 5
 
 // Function signatures
 float degToRad(float);
@@ -252,7 +252,7 @@ void createPointCloud(std::map<std::tuple<float, float, float>, OrganizedPointCl
         vector3d[0] = ((i->second).points_[0]);
         vector3d[1] = (1 + (i->second).points_[1]);
         vector3d[2] = (1 + (i->second).points_[2]);
-        poinCloud.colors_.push_back((i->second).colors_);
+        poinCloud.colors_.push_back((i->second).edge_colors_);
         poinCloud.normals_.push_back((i->second).normals_);
     }
 }
@@ -280,20 +280,20 @@ bool getRightHorizontalPoint(std::map<std::tuple<float, float, float>, Organized
                              OrganizedPointCloud *rRealCoordinate) {
     // y - constant, x - (+), z - (-)&(+)
 
-    std::cout << "\n Current point " << std::get<0>(*currentPoint) << " " << std::get<1>(*currentPoint) << " " << std::get<0>(*currentPoint) << "\n";
+    //std::cout << "\n Current point " << std::get<0>(*currentPoint) << " " << std::get<1>(*currentPoint) << " " << std::get<0>(*currentPoint) << "\n";
 
     std::get<1>(*resultantGridPoint) = std::get<1>(*currentPoint);
     for (int i = 1; i <= NEIGHBOUR_SIZE; i++) {
-        std::get<0>(*resultantGridPoint) = i * GRID_SIZE + std::get<0>(*currentPoint);
+        std::get<0>(*resultantGridPoint) = i * GRID_SIZE / 1000.0 + std::get<0>(*currentPoint);
 
         for (int j = 0; j <= i; j++) {
         
-            std::get<2>(*resultantGridPoint) = j * GRID_SIZE + std::get<2>(*currentPoint);
+            std::get<2>(*resultantGridPoint) = j * GRID_SIZE / 1000.0 + std::get<2>(*currentPoint);
 
             auto iterator = organizedPointMap->find(*resultantGridPoint);
             if (iterator != (*organizedPointMap).end()) {
                 *rRealCoordinate = iterator->second;
-                std::cout << "\n Found Neighbour (1) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
+                //std::cout << "\n Found Neighbour (1) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
 
                 return true;
             }
@@ -301,27 +301,27 @@ bool getRightHorizontalPoint(std::map<std::tuple<float, float, float>, Organized
 
         for (int k = 1; k <= i; k++) {
         
-            std::get<0>(*resultantGridPoint) = -k * GRID_SIZE + std::get<0>(*currentPoint);
+            std::get<0>(*resultantGridPoint) = -k * GRID_SIZE / 1000.0 + std::get<0>(*currentPoint);
 
             auto iterator = organizedPointMap->find(*resultantGridPoint);
             if (iterator != (*organizedPointMap).end()) {
                 *rRealCoordinate = iterator->second;
-                std::cout << "\n Found Neighbour (2) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
+                //std::cout << "\n Found Neighbour (2) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
 
                 return true;
             }
         }
 
-        std::get<0>(*resultantGridPoint) = i * GRID_SIZE + std::get<0>(*currentPoint);
+        std::get<0>(*resultantGridPoint) = i * GRID_SIZE / 1000.0 + std::get<0>(*currentPoint);
 
         for (int j = 1; j <= i; j++) {
         
-            std::get<2>(*resultantGridPoint) = -j * GRID_SIZE + std::get<2>(*currentPoint);
+            std::get<2>(*resultantGridPoint) = -j * GRID_SIZE  / 1000.0+ std::get<2>(*currentPoint);
 
             auto iterator = organizedPointMap->find(*resultantGridPoint);
             if (iterator != (*organizedPointMap).end()) {
                 *rRealCoordinate = iterator->second;
-                std::cout << "\n Found Neighbour (3) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
+                //std::cout << "\n Found Neighbour (3) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
 
                 return true;
             }
@@ -329,12 +329,12 @@ bool getRightHorizontalPoint(std::map<std::tuple<float, float, float>, Organized
 
         for (int k = 1; k <= i; k++) {
         
-            std::get<0>(*resultantGridPoint) = -k * GRID_SIZE + std::get<0>(*currentPoint);
+            std::get<0>(*resultantGridPoint) = -k * GRID_SIZE / 1000.0 + std::get<0>(*currentPoint);
 
             auto iterator = organizedPointMap->find(*resultantGridPoint);
             if (iterator != (*organizedPointMap).end()) {
                 *rRealCoordinate = iterator->second;
-                std::cout << "\n Found Neighbour (4) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
+                //std::cout << "\n Found Neighbour (4) " << std::get<0>(*resultantGridPoint) << " " << std::get<1>(*resultantGridPoint) << " " << std::get<0>(*resultantGridPoint) << "\n";
 
                 return true;
             }
@@ -350,10 +350,17 @@ bool getNeighbourPoint(std::map<std::tuple<float, float, float>, OrganizedPointC
                        std::tuple<float, float, float> *rGridCoordinate,
                        Eigen::Vector3d *rInitialGrad,
                        NEIGHBOUR_DIR dir) {
-    auto iterator = organizedPointMap->find(*currentCoordinate);
+    
     bool isFoundNeighbour;
 
+    
+    
     while (true) {
+        auto iterator = organizedPointMap->find(*currentCoordinate);
+        if ((iterator->second).is_searched) {
+            return false;
+        }
+        (iterator->second).is_searched = true;
         switch (dir) {
             case UP:
                 isFoundNeighbour =
@@ -379,8 +386,11 @@ bool getNeighbourPoint(std::map<std::tuple<float, float, float>, OrganizedPointC
                 return false;
         }
         if (!isFoundNeighbour) {
+            std::cout << " not found\n";
             return false;
         }
+
+        //std::cout << " found\n";
 
         Eigen::Vector3d unitDirectionalVector = (rRealCoordinate->points_ - (iterator->second).points_);
         unitDirectionalVector.normalize();
@@ -410,7 +420,7 @@ bool getNeighbourPoint(std::map<std::tuple<float, float, float>, OrganizedPointC
 void scan(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap, Eigen::Vector3d *point) {
     Eigen::Vector3d startPoint = *point;
 
-    std::cout << "Scanning Points" << (*organizedPointMap).size() << "\n";
+    std::cout << "Scanning Points " << (*organizedPointMap).size() << "\n";
     for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
         std::cout << "\n Scan point for loop " << std::get<0>(i->first) << " " << std::get<1>(i->first) << " " << std::get<0>(i->first) << "\n";
         if ((i->second).is_searched) {
@@ -500,7 +510,7 @@ int main(int argc, char *argv[]) {
     startPoint[2] = std::numeric_limits<int>::max();
     reorderPointCloud(&organizedPointMap, *pointcloudLeftTop, &startPoint);
     auto pointcloudreorder = std::make_shared<geometry::PointCloud>();
-    createPointCloud(&organizedPointMap, *pointcloudreorder);
+    
 
     pointcloudLeftTop->PaintUniformColor({0, 1, 0});
 
@@ -511,6 +521,8 @@ int main(int argc, char *argv[]) {
     // mesh = open3d::geometry::TriangleMesh::CreateFromPointCloudBallPivoting(*pointcloudreorder.get(), radii);
 
     scan(&organizedPointMap, &startPoint);
+
+    createPointCloud(&organizedPointMap, *pointcloudreorder);
 
     visualization::DrawGeometries({pointcloudreorder, mesh}, "PointCloud", 1600, 900, 50, 50, false, true, true);
 
