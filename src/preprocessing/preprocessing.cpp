@@ -203,6 +203,28 @@ void initNewOrganizedPoint(OrganizedPointCloud *organizedPoint) {
     (*organizedPoint).edge_colors_ = {1, 0, 0};
 }
 
+void layerPoints(std::map<std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
+                 std::map<float, std::vector<OrganizedPointCloud>> *layer,
+                 int layerNo) {
+    for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
+
+        std::tuple<float, float, float> a = (i->first);
+        float point = 0;
+        if (layerNo == 0) {
+            point = std::get<0>(a);
+        } else if (layerNo == 1) {
+            point = std::get<1>(a);
+        } else {
+            point = std::get<2>(a);
+        }
+
+        auto iteratorX = layer->find(point);
+        if (iteratorX == (*layer).end()) {
+            (*layer).insert(std::pair<float, OrganizedPointCloud>(poinCloud.points_[i][0], newOrganizedPointCloud));
+        }
+    }
+}
+
 void reorderPointCloud(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
                        open3d::geometry::PointCloud &poinCloud,
                        Eigen::Vector3d *startPoint) {
@@ -213,6 +235,7 @@ void reorderPointCloud(std::map<const std::tuple<float, float, float>, Organized
         std::get<0>(coordinate) = ((((int)(std::get<0>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
         std::get<1>(coordinate) = ((((int)(std::get<1>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
         std::get<2>(coordinate) = ((((int)(std::get<2>(coordinate) * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
+
         auto iterator = organizedPointMap->find(coordinate);
         if (iterator == (*organizedPointMap).end()) {
             // not present
@@ -263,7 +286,8 @@ void addNewPoint(std::map<const std::tuple<float, float, float>, OrganizedPointC
                  const std::tuple<float, float, float> *coordinate) {
     OrganizedPointCloud newOrganizedPointCloud;
 
-    newOrganizedPointCloud.points_ = {std::get<0>(*coordinate), std::get<1>(*coordinate), std::get<2>(*coordinate)};  // vector3d;
+    newOrganizedPointCloud.points_ = {std::get<0>(*coordinate), std::get<1>(*coordinate),
+                                      std::get<2>(*coordinate)};  // vector3d;
     newOrganizedPointCloud.colors_ = {0, 0, 0};
     newOrganizedPointCloud.edge_colors_ = {0, 0, 0};
     newOrganizedPointCloud.normals_ = {0, 1, 0};
@@ -313,7 +337,7 @@ bool getRightHorizontalPoint(std::map<const std::tuple<float, float, float>, Org
                           << std::get<1>(*resultantGridPoint) << " " << std::get<2>(*resultantGridPoint) << "\n";
                 // char x[5];
                 // std::cin >> x;
-                //return true;
+                // return true;
                 addNewPoint(organizedPointMap, resultantGridPoint);
             } else {
                 addNewPoint(organizedPointMap, resultantGridPoint);
@@ -331,7 +355,7 @@ bool getRightHorizontalPoint(std::map<const std::tuple<float, float, float>, Org
                           << std::get<1>(*resultantGridPoint) << " " << std::get<2>(*resultantGridPoint) << "\n";
                 // char x[5];
                 // std::cin >> x;
-                //return true;
+                // return true;
                 addNewPoint(organizedPointMap, resultantGridPoint);
             } else {
                 addNewPoint(organizedPointMap, resultantGridPoint);
@@ -375,7 +399,7 @@ bool getRightHorizontalPoint(std::map<const std::tuple<float, float, float>, Org
         //         addNewPoint(organizedPointMap, resultantGridPoint);
         //     }
         // }
-        //return false;
+        // return false;
     }
 
     return false;
@@ -477,7 +501,7 @@ void scan(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *
         limitX++;
 
         std::cout << "\n Scan point for loop " << std::get<0>(i->first) << " " << std::get<1>(i->first) << " "
-                  << std::get<0>(i->first) << "\n";
+                  << std::get<1>(i->first) << "\n";
         if ((i->second).is_searched) {
             std::cout << "already visited 2 \n";
             continue;
@@ -562,12 +586,18 @@ int main(int argc, char *argv[]) {
     pointcloudLeftTop->NormalizeNormals();
 
     std::map<const std::tuple<float, float, float>, OrganizedPointCloud> organizedPointMap;
+
+    std::map<float, std::vector<OrganizedPointCloud>> constantXPoints;
+    std::map<float, std::vector<OrganizedPointCloud>> constantYPoints;
+    std::map<float, std::vector<OrganizedPointCloud>> constantZPoints;
+
     // <coordinate, OrganizedPointCloud>
     Eigen::Vector3d startPoint;
     startPoint[0] = std::numeric_limits<int>::max();
     startPoint[1] = std::numeric_limits<int>::max();
     startPoint[2] = std::numeric_limits<int>::max();
-    reorderPointCloud(&organizedPointMap, *pointcloudLeftTop, &startPoint);
+    reorderPointCloud(&organizedPointMap, *pointcloudLeftTop, &startPoint, &constantXPoints, &constantYPoints,
+                      &constantZPoints);
     auto pointcloudreorder = std::make_shared<geometry::PointCloud>();
 
     pointcloudLeftTop->PaintUniformColor({0, 1, 0});
