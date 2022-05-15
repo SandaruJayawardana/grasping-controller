@@ -54,7 +54,7 @@
 #define CAMERA_LEFT_TOP_CENTER_CORRECTION_Z 0.26
 
 // Properties of Organized Points
-#define GRID_SIZE 1  // In milimeter
+#define GRID_SIZE 5  // In milimeter
 #define GRID_SIZE_HALF 0.5
 #define NEIGHBOUR_SIZE 10
 
@@ -107,6 +107,10 @@ struct OrganizedPointCloud {
     Eigen::Vector3d d_vertical_grad;
 };
 
+struct PointerForOrganizePoint {
+    OrganizedPointCloud *pointer;
+};
+
 enum NEIGHBOUR_DIR { UP, DOWN, LEFT, RIGHT };
 
 const CameraOrientation LEFT_TOP = {
@@ -140,6 +144,8 @@ const CameraOrientation CROP_BOX = {
 };
 
 float degToRad(float degree) { return degree * (M_PI / 180); }
+
+int pointCloudNo = 0;
 
 Eigen::Matrix3d getRotationalMatrix(CameraOrientation orientation) {
     Eigen::Matrix3d rMat{{cos(orientation.Z_ANGLE) * cos(orientation.Y_ANGLE),
@@ -204,7 +210,7 @@ void initNewOrganizedPoint(OrganizedPointCloud *organizedPoint) {
 }
 
 void layerPoints(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
-                 std::map<float, std::vector<OrganizedPointCloud>> *layer,
+                 std::map<float, std::vector<PointerForOrganizePoint>> *layer,
                  int layerNo) {
     for (auto i = (*organizedPointMap).begin(); i != (*organizedPointMap).end(); ++i) {
         std::tuple<float, float, float> a = (i->first);
@@ -219,12 +225,16 @@ void layerPoints(std::map<const std::tuple<float, float, float>, OrganizedPointC
 
         auto iterator = layer->find(point);
         if (iterator == (*layer).end()) {
-            std::cout << "new point " << point << "\n";  
-            std::vector<OrganizedPointCloud> newVector = {(point, i->second)};
-            (*layer).insert(std::pair<float, std::vector<OrganizedPointCloud>>(point, newVector));
+            std::cout << "new point " << point << "\n"; 
+            PointerForOrganizePoint newPointer;
+            newPointer.pointer = &(i->second);
+            std::vector<PointerForOrganizePoint> newVector = {(point, newPointer)};
+            (*layer).insert(std::pair<float, std::vector<PointerForOrganizePoint>>(point, newVector));
         } else {
             // std::cout << "existing point " << point << "\n";
-            (iterator->second).push_back(i->second);
+            PointerForOrganizePoint newPointer;
+            newPointer.pointer = &(i->second);
+            (iterator->second).push_back(newPointer);
         }
     }
 }
@@ -232,7 +242,7 @@ void layerPoints(std::map<const std::tuple<float, float, float>, OrganizedPointC
 void reorderPointCloud(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
                        open3d::geometry::PointCloud &poinCloud,
                        Eigen::Vector3d *startPoint) {
-    std::cout << poinCloud.points_.size() << "\n";
+    std::cout << "before size " << poinCloud.points_.size() << "\n";
     for (int i = 0; i < poinCloud.points_.size(); i++) {
         std::tuple<float, float, float> coordinate = {poinCloud.points_[i][0], poinCloud.points_[i][1],
                                                       poinCloud.points_[i][2]};
@@ -245,7 +255,13 @@ void reorderPointCloud(std::map<const std::tuple<float, float, float>, Organized
             // not present
             OrganizedPointCloud newOrganizedPointCloud;
 
-            newOrganizedPointCloud.points_ = poinCloud.points_[i];  // vector3d;
+            Eigen::Vector3d vector3d;
+            vector3d[0] = std::get<0>(coordinate);
+            vector3d[1] = std::get<1>(coordinate);
+            vector3d[2] = std::get<2>(coordinate);
+            
+            newOrganizedPointCloud.pointCloudNo = pointCloudNo;
+            newOrganizedPointCloud.points_ = {poinCloud.points_[i][0], std::get<1>(coordinate), poinCloud.points_[i][2]};  // vector3d;
             newOrganizedPointCloud.colors_ = poinCloud.colors_[i];
             newOrganizedPointCloud.normals_ = poinCloud.normals_[i];
             initNewOrganizedPoint(&newOrganizedPointCloud);
@@ -265,9 +281,11 @@ void reorderPointCloud(std::map<const std::tuple<float, float, float>, Organized
             vector3d[0] = poinCloud.points_[i][0];
             vector3d[1] = poinCloud.points_[i][1];
             vector3d[2] = poinCloud.points_[i][2];
-            (iterator->second).points_ = ((iterator->second).points_ + vector3d) / 2;
+            // (iterator->second).points_ = ((iterator->second).points_ + vector3d) / 2;
         }
     }
+    pointCloudNo += 1;
+    std::cout << "after size " << (*organizedPointMap).size() << "\n";
 }
 
 void createPointCloud(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
@@ -532,11 +550,11 @@ void scan(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *
     }
 }
 
-void createPointCloudFromVector(std::vector<OrganizedPointCloud> *vector, open3d::geometry::PointCloud &poinCloud) {
+void createPointCloudFromVector(std::vector<PointerForOrganizePoint> *vector, open3d::geometry::PointCloud &poinCloud) {
     for (auto i = 0; i != (*vector).size(); ++i) {
-        poinCloud.points_.push_back((*vector)[i].points_);
-        poinCloud.colors_.push_back((*vector)[i].edge_colors_);
-        poinCloud.normals_.push_back((*vector)[i].normals_);
+        poinCloud.points_.push_back((*(*vector)[i].pointer).points_);
+        poinCloud.colors_.push_back((*(*vector)[i].pointer).edge_colors_);
+        poinCloud.normals_.push_back((*(*vector)[i].pointer).normals_);
     }
 }
 
@@ -584,7 +602,7 @@ int main(int argc, char *argv[]) {
     sphere->ComputeVertexNormals();
     sphere->PaintUniformColor({0.0, 1.0, 0.0});
 
-    *pointcloudLeftTop.get() += *pointcloudRightTop.get();
+    // *pointcloudLeftTop.get() += *pointcloudRightTop.get();
     std::vector<double> radii = {0.02};
 
     auto mesh = std::make_shared<geometry::TriangleMesh>();
@@ -592,16 +610,16 @@ int main(int argc, char *argv[]) {
     mesh->PaintUniformColor({1.0, 0.0, 0.0});
     // visualization::DrawGeometries({pointcloudLeftTop, mesh, sphere}, "PointCloud", 1600, 900);
 
-    pointcloudRightTop->EstimateNormals();
-    pointcloudRightTop->NormalizeNormals();
-    pointcloudLeftTop->EstimateNormals();
-    pointcloudLeftTop->NormalizeNormals();
+    // pointcloudRightTop->EstimateNormals();
+    // pointcloudRightTop->NormalizeNormals();
+    // pointcloudLeftTop->EstimateNormals();
+    // pointcloudLeftTop->NormalizeNormals();
 
     std::map<const std::tuple<float, float, float>, OrganizedPointCloud> organizedPointMap;
 
-    std::map<float, std::vector<OrganizedPointCloud>> constantXPoints;
-    std::map<float, std::vector<OrganizedPointCloud>> constantYPoints;
-    std::map<float, std::vector<OrganizedPointCloud>> constantZPoints;
+    std::map<float, std::vector<PointerForOrganizePoint>> constantXPoints;
+    std::map<float, std::vector<PointerForOrganizePoint>> constantYPoints;
+    std::map<float, std::vector<PointerForOrganizePoint>> constantZPoints;
 
     // <coordinate, OrganizedPointCloud>
     Eigen::Vector3d startPoint;
@@ -623,8 +641,8 @@ int main(int argc, char *argv[]) {
 
     layerPoints(&organizedPointMap, &constantXPoints, 1);
 
-    float x = 0;
-    float endX = 6;
+    float x = -0;
+    float endX = 3;
     while (x < endX) {
         float calculatedX = x * GRID_SIZE/1000.0;
         auto iterator = constantXPoints.find(calculatedX);
@@ -639,7 +657,7 @@ int main(int argc, char *argv[]) {
 
     // createPointCloud(&organizedPointMap, *pointcloudreorder);
 
-    visualization::DrawGeometries({pointcloudreorder, mesh, sphere}, "PointCloud", 1600, 900, 50, 50, false, true, true);
+    visualization::DrawGeometries({pointcloudreorder, mesh /*, sphere*/}, "PointCloud", 1600, 900, 50, 50, false, true, true);
 
     std::cout << "\n" << startPoint[0] << " " << startPoint[1] << " " << startPoint[2] << "\n";
     return 0;
