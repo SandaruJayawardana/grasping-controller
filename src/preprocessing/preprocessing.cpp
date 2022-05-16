@@ -56,7 +56,7 @@
 // Properties of Organized Points
 #define GRID_SIZE 5  // In milimeter
 #define GRID_SIZE_HALF 0.5
-#define NEIGHBOUR_SIZE 5
+#define NEIGHBOUR_SIZE 3
 
 // Function signatures
 float degToRad(float);
@@ -88,6 +88,7 @@ struct OrganizedPointCloud {
     Eigen::Vector3d colors_;
 
     Eigen::Vector3d roundedPoints_;
+    Eigen::Vector3d sourcePoint_;
     // Eigen::Matrix3d covariances_;
 
     // neighbour points
@@ -571,11 +572,11 @@ void scan(std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *
     }
 }
 
-void createPointCloudFromVector(std::vector<PointerForOrganizePoint> *vector, open3d::geometry::PointCloud &poinCloud) {
+void createPointCloudFromVector(std::vector<PointerForOrganizePoint> *vector, open3d::geometry::PointCloud &poinCloud, Eigen::Vector3d color = {0, 0, 1}) {
     std::cout << " (*vector).size() " << (*vector).size() << "\n";
     for (auto i = 0; i != (*vector).size(); ++i) {
         poinCloud.points_.push_back((*(*vector)[i].pointer).points_);
-        poinCloud.colors_.push_back((*(*vector)[i].pointer).colors_);
+        poinCloud.colors_.push_back(color);
         poinCloud.normals_.push_back((*(*vector)[i].pointer).normals_);
     }
 }
@@ -611,17 +612,18 @@ void searchAndUpdateNeighbours(
     float initialValue = (*currentVectorPoint)[variableAxisNo];
 
     std::tuple<float, float, float> coordinate;
-    std::get<0>(coordinate) = ((((int)((*currentVectorPoint)[0] * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
-    std::get<1>(coordinate) = ((((int)((*currentVectorPoint)[1] * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
-    std::get<2>(coordinate) = ((((int)((*currentVectorPoint)[2] * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
-    
+    std::get<0>(coordinate) = (*currentVectorPoint)[0]; //((((int)((*currentVectorPoint)[0] * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
+    std::get<1>(coordinate) = (*currentVectorPoint)[1]; //((((int)((*currentVectorPoint)[1] * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
+    std::get<2>(coordinate) = (*currentVectorPoint)[2]; //((((int)((*currentVectorPoint)[2] * 1000)) / GRID_SIZE) * GRID_SIZE) / 1000.0;
+    // std::cout << "point present";
+    bool a = false;
     for (int i = -limit; i <= limit; i++) {
         if (variableAxisNo == 0) {
-            std::get<0>(coordinate) = initialValue + i * GRID_SIZE / 1000.0;
+            std::get<0>(coordinate) = ((int(initialValue * 1000)) + i * GRID_SIZE) / 1000.0;
         } else if (variableAxisNo == 1) {
-            std::get<1>(coordinate) = initialValue + i * GRID_SIZE / 1000.0;
+            std::get<1>(coordinate) = ((int(initialValue * 1000)) + i * GRID_SIZE) / 1000.0;
         } else {
-            std::get<2>(coordinate) = initialValue + i * GRID_SIZE / 1000.0;
+            std::get<2>(coordinate) = ((int(initialValue * 1000)) + i * GRID_SIZE) / 1000.0;
         }
         auto iterator = organizedPointMap->find(coordinate);
 
@@ -635,17 +637,31 @@ void searchAndUpdateNeighbours(
         //std::cout << "searching coordinate " << std::get<0>(coordinate) << " " << std::get<1>(coordinate) << " " << std::get<2>(coordinate) << "\n";
 
         if (iterator != (*organizedPointMap).end()) {
-            std::cout << "point present\n";
+            a = true;
+            std::cout << "  found " << std::get<0>(coordinate) << " " << std::get<1>(coordinate) << " " << std::get<2>(coordinate);
+            if (iterator->second.isVisitedNode) {
+                continue;
+            }
             if (iterator->second.hasFoundNode) {
+                iterator->second.sourcePoint_ = sourcePoint->roundedPoints_;
                 continue;
             }
             iterator->second.hasFoundNode = true;
+            iterator->second.sourcePoint_ = sourcePoint->roundedPoints_;
+
             PointerForEdgeDetection unresolvedNode;
             unresolvedNode.sourcePoint = sourcePoint;
             unresolvedNode.targetPoint = &iterator->second;
+            
             unresolvedNodes->push_back(unresolvedNode);
+        } else {
+            std::cout << "not  found " << std::get<0>(coordinate) << " " << std::get<1>(coordinate) << " " << std::get<2>(coordinate) << "\n";
         }
     }
+    if (a) {
+        std::cout << "\n";
+    }
+    
 }
 
 bool searchNeighbours(OrganizedPointCloud *sourcePoint,
@@ -657,7 +673,7 @@ bool searchNeighbours(OrganizedPointCloud *sourcePoint,
                       std::map<const std::tuple<float, float, float>, OrganizedPointCloud> *organizedPointMap,
                       std::vector<PointerForOrganizePoint> *outputVector) {
     for (int i = 1; i < NEIGHBOUR_SIZE; i++) {
-        std::cout << "i " << i << "\n";
+        // std::cout << "i " << i << "\n";
         Eigen::Vector3d currentVectorPoint;
 
         int iteratorOneVariableAxisNo;
@@ -665,16 +681,16 @@ bool searchNeighbours(OrganizedPointCloud *sourcePoint,
 
         if (constAxisNo == 0) {
             currentVectorPoint = {constAxisValue, (*targetPoint).roundedPoints_[1],
-                                  (*targetPoint).roundedPoints_[2] + i * GRID_SIZE / 1000.0};
+                                  ((int)((*targetPoint).roundedPoints_[2] * 1000) + i * GRID_SIZE) / 1000.0};
             iteratorOneVariableAxisNo = 1;
             iteratorTwoVariableAxisNo = 2;
         } else if (constAxisNo == 1) {
             currentVectorPoint = {(*targetPoint).roundedPoints_[0], constAxisValue,
-                                  (*targetPoint).roundedPoints_[2] + i * GRID_SIZE / 1000.0};
+                                  ((int)((*targetPoint).roundedPoints_[2] * 1000) + i * GRID_SIZE) / 1000.0};
             iteratorOneVariableAxisNo = 0;
             iteratorTwoVariableAxisNo = 2;
         } else {
-            currentVectorPoint = {(*targetPoint).roundedPoints_[0], (*targetPoint).roundedPoints_[1] + i * GRID_SIZE / 1000.0,
+            currentVectorPoint = {(*targetPoint).roundedPoints_[0], ((int)((*targetPoint).roundedPoints_[1] * 1000) + i * GRID_SIZE) / 1000.0,
                                   constAxisValue};
             iteratorOneVariableAxisNo = 0;
             iteratorTwoVariableAxisNo = 1;
@@ -685,12 +701,12 @@ bool searchNeighbours(OrganizedPointCloud *sourcePoint,
 
         if (constAxisNo == 0) {
             currentVectorPoint = {constAxisValue, (*targetPoint).roundedPoints_[1],
-                                  (*targetPoint).roundedPoints_[2] - i * GRID_SIZE / 1000.0};
+                                  ((int)((*targetPoint).roundedPoints_[2] * 1000) - i * GRID_SIZE) / 1000.0};
         } else if (constAxisNo == 1) {
             currentVectorPoint = {(*targetPoint).roundedPoints_[0], constAxisValue,
-                                  (*targetPoint).roundedPoints_[2] - i * GRID_SIZE / 1000.0};
+                                  ((int)((*targetPoint).roundedPoints_[2] * 1000) - i * GRID_SIZE) / 1000.0};
         } else {
-            currentVectorPoint = {(*targetPoint).roundedPoints_[0], (*targetPoint).roundedPoints_[1] - i * GRID_SIZE / 1000.0,
+            currentVectorPoint = {(*targetPoint).roundedPoints_[0], ((int)((*targetPoint).roundedPoints_[1] * 1000) - i * GRID_SIZE) / 1000.0,
                                   constAxisValue};
         }
 
@@ -698,13 +714,13 @@ bool searchNeighbours(OrganizedPointCloud *sourcePoint,
                                   unresolvedNodes, organizedPointMap, outputVector);
 
         if (constAxisNo == 0) {
-            currentVectorPoint = {constAxisValue, (*targetPoint).roundedPoints_[1] + i * GRID_SIZE / 1000.0,
+            currentVectorPoint = {constAxisValue, ((int)((*targetPoint).roundedPoints_[1] * 1000) + i * GRID_SIZE) / 1000.0,
                                   (*targetPoint).roundedPoints_[2]};
         } else if (constAxisNo == 1) {
-            currentVectorPoint = {(*targetPoint).roundedPoints_[0] + i * GRID_SIZE / 1000.0, constAxisValue,
+            currentVectorPoint = {((int)((*targetPoint).roundedPoints_[0] * 1000) + i * GRID_SIZE) / 1000.0, constAxisValue,
                                   (*targetPoint).roundedPoints_[2]};
         } else {
-            currentVectorPoint = {(*targetPoint).roundedPoints_[0], (*targetPoint).roundedPoints_[1] + i * GRID_SIZE / 1000.0,
+            currentVectorPoint = {(*targetPoint).roundedPoints_[0], ((int)((*targetPoint).roundedPoints_[1] * 1000) + i * GRID_SIZE) / 1000.0,
                                   constAxisValue};
         }
 
@@ -712,13 +728,13 @@ bool searchNeighbours(OrganizedPointCloud *sourcePoint,
                                   unresolvedNodes, organizedPointMap, outputVector);
 
         if (constAxisNo == 0) {
-            currentVectorPoint = {constAxisValue, (*targetPoint).roundedPoints_[1] - i * GRID_SIZE / 1000.0,
+            currentVectorPoint = {constAxisValue, ((int)((*targetPoint).roundedPoints_[1] * 1000) - i * GRID_SIZE) / 1000.0,
                                   (*targetPoint).roundedPoints_[2]};
         } else if (constAxisNo == 1) {
-            currentVectorPoint = {(*targetPoint).roundedPoints_[0] - i * GRID_SIZE / 1000.0, constAxisValue,
+            currentVectorPoint = {((int)((*targetPoint).roundedPoints_[0] * 1000) - i * GRID_SIZE) / 1000.0, constAxisValue,
                                   (*targetPoint).roundedPoints_[2]};
         } else {
-            currentVectorPoint = {(*targetPoint).roundedPoints_[0], (*targetPoint).roundedPoints_[1] - i * GRID_SIZE / 1000.0,
+            currentVectorPoint = {(*targetPoint).roundedPoints_[0], ((int)((*targetPoint).roundedPoints_[1] * 1000) - i * GRID_SIZE) / 1000.0,
                                   constAxisValue};
         }
 
@@ -727,11 +743,11 @@ bool searchNeighbours(OrganizedPointCloud *sourcePoint,
         
         
     }
-    targetPoint->isVisitedNode = true;
+    
     return false;
 }
 
-void edgeDetection(std::vector<PointerForOrganizePoint> *inputVector,
+void downSamplePoint(std::vector<PointerForOrganizePoint> *inputVector,
                    std::vector<PointerForOrganizePoint> *outputVector,
                    float constAxisValue,
                    int constAxisNo,
@@ -741,29 +757,42 @@ void edgeDetection(std::vector<PointerForOrganizePoint> *inputVector,
     OrganizedPointCloud *sourcePoint;
     OrganizedPointCloud *targetPoint;
 
-    float minLength = 0.03;  // in millimeters
+    float minLength = 0.02;  // in millimeters
 
     for (int i = 0; i < (*inputVector).size(); i++) {
         sourcePoint = (*inputVector)[i].pointer;
 
         PointerForOrganizePoint newPointer;
         newPointer.pointer = sourcePoint;
-        outputVector->push_back(newPointer);
+        
 
         if ((*sourcePoint).isVisitedNode) {
             continue;
         }
+
+        std::cout << " sourcePoint 1 " << (*sourcePoint).roundedPoints_[0] << " " << (*sourcePoint).roundedPoints_[1] << " " << (*sourcePoint).roundedPoints_[2] << "\n";
+        std::cout << " targetPoint 1 " << (*sourcePoint).roundedPoints_[0] << " " << (*sourcePoint).roundedPoints_[1] << " " << (*sourcePoint).roundedPoints_[2] << "\n";
+        outputVector->push_back(newPointer);
 
         if (searchNeighbours(sourcePoint, sourcePoint, inputVector, &unresolvedNodes, constAxisValue, constAxisNo,
                              organizedPointMap, outputVector)) {
             // neighbours are available
         }
 
+        sourcePoint->isVisitedNode = true;
+        sourcePoint->hasFoundNode = true;
+
         std::cout << "unresolvedNodes " << unresolvedNodes.size() << "\n";
         while (0 < unresolvedNodes.size()) {
             PointerForEdgeDetection unresolvedNode = unresolvedNodes.back();
             unresolvedNodes.pop_back();
-            sourcePoint = unresolvedNode.sourcePoint;
+
+            std::tuple<float, float, float> coordinate = {unresolvedNode.targetPoint->sourcePoint_[0], unresolvedNode.targetPoint->sourcePoint_[1],
+                                                      unresolvedNode.targetPoint->sourcePoint_[2]};
+
+            auto iterator = organizedPointMap->find(coordinate);
+
+            sourcePoint = &iterator->second;
             targetPoint = unresolvedNode.targetPoint;
 
             if ((*targetPoint).isVisitedNode) {
@@ -772,7 +801,16 @@ void edgeDetection(std::vector<PointerForOrganizePoint> *inputVector,
 
             float lenBetweenSrcAndDest =
                     ((*sourcePoint).points_ - (*targetPoint).points_).norm();  // TODO: reduce to 2 dimension
+            Eigen::Vector3d aaa = ((*sourcePoint).points_ - (*targetPoint).points_);
+
+            std::cout << "lenght " << std::sqrt(std::pow(aaa[0], 2) + std::pow(aaa[1], 2) + std::pow(aaa[2], 2)) << "\n";
+            
             std::cout << " length between points " << lenBetweenSrcAndDest << "\n";
+
+
+            std::cout << " sourcePoint 2 " << (*sourcePoint).roundedPoints_[0] << " " << (*sourcePoint).roundedPoints_[1] << " " << (*sourcePoint).roundedPoints_[2] << "\n";
+            std::cout << " targetPoint 2 " << (*targetPoint).roundedPoints_[0] << " " << (*targetPoint).roundedPoints_[1] << " " << (*targetPoint).roundedPoints_[2] << "\n";
+
             if (lenBetweenSrcAndDest > minLength) {
                 PointerForOrganizePoint newPointer;
                 PointerForOrganizePoint nextNode;
@@ -783,6 +821,9 @@ void edgeDetection(std::vector<PointerForOrganizePoint> *inputVector,
                 (sourcePoint)->nextNode.push_back(*newPointer.pointer);
                 (targetPoint)->nextNode.push_back(*nextNode.pointer);
 
+                sourcePoint = targetPoint;
+                std::cout << " sourcePoint 3 " << (*sourcePoint).roundedPoints_[0] << " " << (*sourcePoint).roundedPoints_[1] << " " << (*sourcePoint).roundedPoints_[2] << "\n";
+                std::cout << " targetPoint 3 " << (*targetPoint).roundedPoints_[0] << " " << (*targetPoint).roundedPoints_[1] << " " << (*targetPoint).roundedPoints_[2] << "\n";
                 outputVector->push_back(newPointer);
             }
 
@@ -790,8 +831,22 @@ void edgeDetection(std::vector<PointerForOrganizePoint> *inputVector,
                                  organizedPointMap, outputVector)) {
                 // neighbours are available
             }
+
+            targetPoint->isVisitedNode = true;
+            sourcePoint->hasFoundNode = true;
         }
     }
+}
+
+void edgeDetection(std::vector<PointerForOrganizePoint> *inputVector,
+                   std::vector<PointerForOrganizePoint> *outputVector,
+                   float constAxisValue,
+                   int constAxisNo) {
+
+    for(int i = 0; i < (*inputVector).size(); i++) {
+
+    }
+
 }
 
 int main(int argc, char *argv[]) {
@@ -877,7 +932,7 @@ int main(int argc, char *argv[]) {
 
     layerPoints(&organizedPointMap, &constantXPoints, 1);
 
-    float x = -0;
+    float x = 0;
     float endX = 3;
     while (x < endX) {
         float calculatedX = x * GRID_SIZE / 1000.0;
@@ -885,10 +940,17 @@ int main(int argc, char *argv[]) {
         if (iterator != constantXPoints.end()) {
             std::cout << " available " << calculatedX << "\n";
             std::vector<PointerForOrganizePoint> outputVector;
-            edgeDetection(&constantXPoints.at(calculatedX), &outputVector, calculatedX, 1, &organizedPointMap);
+
+            for (int k = 0; k < (constantXPoints.at(calculatedX)).size(); k++) {
+                std::cout << "  point " << ((constantXPoints.at(calculatedX))[k].pointer)->roundedPoints_[0] << " " << ((constantXPoints.at(calculatedX))[k].pointer)->roundedPoints_[1] << " " << ((constantXPoints.at(calculatedX))[k].pointer)->roundedPoints_[2];
+            }
+            std::cout << "\n";
+
+            downSamplePoint(&constantXPoints.at(calculatedX), &outputVector, calculatedX, 1, &organizedPointMap);
             std::cout << " input vector size " << (constantXPoints.at(calculatedX)).size() << "\n";
             std::cout << " output vector size  " << outputVector.size() << "\n";
             createPointCloudFromVector(&outputVector, *pointcloudreorder);
+            createPointCloudFromVector(&(constantXPoints.at(calculatedX)), *pointcloudreorder, {1, 0, 0});
         } else {
             std::cout << " miss " << calculatedX << "\n";
         }
@@ -897,7 +959,7 @@ int main(int argc, char *argv[]) {
 
     
 
-    createPointCloud(&debugMap, *pointcloudreorder);
+    // createPointCloud(&debugMap, *pointcloudreorder);
 
     std::cout << " point cound " << pointcloudreorder->points_.size() << "\n";
 
